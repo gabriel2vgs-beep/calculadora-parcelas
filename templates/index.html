@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>💰 Calculadora de Parcelas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-5">
+    <div class="card shadow p-4 mx-auto" style="max-width: 500px;">
+        <h3 class="text-center mb-4">💰 Calculadora de Parcelas</h3>
+
+        <!-- Passo 1 -->
+        <div id="passo1">
+            <label class="form-label">📅 Data de Emissão</label>
+            <input type="date" id="dataEmissao" class="form-control mb-3" required>
+            <button class="btn btn-primary w-100" onclick="iniciar()">Continuar</button>
+        </div>
+
+        <!-- Passo 2 -->
+        <div id="passo2" style="display:none;">
+            <label class="form-label">⏱ Dias até a <span id="numParcela">1ª</span> parcela:</label>
+            <input type="number" id="diasParcela" class="form-control mb-3" min="1" placeholder="Ex: 29">
+            <div class="d-flex gap-2">
+                <button class="btn btn-success w-50" onclick="adicionarParcela()">Adicionar</button>
+                <button class="btn btn-secondary w-50" onclick="finalizar()">Finalizar</button>
+            </div>
+
+            <!-- Lista de parcelas -->
+            <ul id="listaParciais" class="list-group mt-3"></ul>
+        </div>
+
+        <!-- Resultado -->
+        <div id="resultado" class="mt-4" style="display:none;">
+            <h5 class="text-center mb-3">📅 Resultados</h5>
+            <table class="table table-bordered text-center">
+                <thead class="table-primary">
+                    <tr><th>Parcela</th><th>Após (dias)</th><th>Data</th></tr>
+                </thead>
+                <tbody id="tabelaResultados"></tbody>
+            </table>
+            <button class="btn btn-outline-primary w-100 mt-3" onclick="novaSimulacao()">🔄 Nova Simulação</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let diasLista = [];
+let parcelaAtual = 1;
+let dataEmissao = "";
+
+// Inicia o fluxo
+function iniciar() {
+    dataEmissao = document.getElementById("dataEmissao").value;
+    if (!dataEmissao) {
+        alert("Escolha a data de emissão primeiro.");
+        return;
+    }
+    document.getElementById("passo1").style.display = "none";
+    document.getElementById("passo2").style.display = "block";
+    document.getElementById("diasParcela").focus();
+}
+
+// Atualiza a lista visual
+function atualizarLista() {
+    const lista = document.getElementById("listaParciais");
+    lista.innerHTML = "";
+    diasLista.forEach((dias, index) => {
+        const item = document.createElement("li");
+        item.className = "list-group-item d-flex justify-content-between align-items-center";
+        item.innerHTML = `
+            <span>${index + 1}ª parcela - ${dias} dias</span>
+            <div>
+                <button class="btn btn-sm btn-outline-warning me-2" onclick="editarParcela(${index})">✏️</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="removerParcela(${index})">🗑️</button>
+            </div>
+        `;
+        lista.appendChild(item);
+    });
+
+    parcelaAtual = diasLista.length + 1;
+    document.getElementById("numParcela").textContent = `${parcelaAtual}ª`;
+}
+
+// Adiciona parcela
+function adicionarParcela() {
+    const diasInput = document.getElementById("diasParcela");
+    const dias = parseInt(diasInput.value);
+    if (!dias || dias < 1) {
+        alert("Digite um número válido de dias.");
+        return;
+    }
+    diasLista.push(dias);
+    diasInput.value = "";
+    atualizarLista();
+    diasInput.focus();
+}
+
+// Edita parcela
+function editarParcela(index) {
+    const novoValor = prompt(`Editar dias da ${index + 1}ª parcela:`, diasLista[index]);
+    if (novoValor !== null && !isNaN(novoValor) && novoValor > 0) {
+        diasLista[index] = parseInt(novoValor);
+        atualizarLista();
+    } else if (novoValor !== null) {
+        alert("Valor inválido.");
+    }
+}
+
+// Remove parcela
+function removerParcela(index) {
+    if (confirm(`Remover a ${index + 1}ª parcela?`)) {
+        diasLista.splice(index, 1);
+        atualizarLista();
+    }
+}
+
+// Finaliza cálculo
+async function finalizar() {
+    if (diasLista.length === 0) {
+        alert("Adicione pelo menos uma parcela.");
+        return;
+    }
+
+    const response = await fetch("/calcular", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ data: dataEmissao, dias_lista: diasLista })
+    });
+
+    const resultados = await response.json();
+    if (!response.ok) {
+        alert(resultados.erro || "Erro ao calcular.");
+        return;
+    }
+
+    const tbody = document.getElementById("tabelaResultados");
+    tbody.innerHTML = "";
+    resultados.forEach(r => {
+        tbody.innerHTML += `
+            <tr>
+                <td>${r.parcela}ª</td>
+                <td>${r.dias}</td>
+                <td><b>${r.data}</b></td>
+            </tr>`;
+    });
+
+    document.getElementById("resultado").style.display = "block";
+    document.getElementById("passo2").style.display = "none";
+}
+
+// Reinicia tudo
+function novaSimulacao() {
+    diasLista = [];
+    parcelaAtual = 1;
+    dataEmissao = "";
+
+    document.getElementById("dataEmissao").value = "";
+    document.getElementById("listaParciais").innerHTML = "";
+    document.getElementById("tabelaResultados").innerHTML = "";
+    document.getElementById("numParcela").textContent = "1ª";
+
+    document.getElementById("resultado").style.display = "none";
+    document.getElementById("passo2").style.display = "none";
+    document.getElementById("passo1").style.display = "block";
+}
+</script>
+</body>
+</html>
